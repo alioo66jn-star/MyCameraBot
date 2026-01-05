@@ -4,10 +4,16 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-22.04 # نسخة مستقرة جداً لبناء أندرويد
+    runs-on: ubuntu-22.04
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
 
       - name: Install System Dependencies
         run: |
@@ -18,8 +24,10 @@ jobs:
       - name: Build with Buildozer
         run: |
           export PATH=$PATH:$HOME/.local/bin
-          # هذا الأمر سيقوم بالرد بـ "نعم" تلقائياً على كل شروط أندرويد
-          yes | buildozer android debug
+          # قبول التراخيص وتنظيف البيئة قبل البدء
+          yes | buildozer android clean
+          yes | buildozer -v android debug
+        continue-on-error: false
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
