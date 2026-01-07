@@ -20,7 +20,7 @@ class CameraBotApp(App):
 
         # العنوان الرئيسي
         self.layout.add_widget(Label(
-            text=" shm1 ",
+            text=" sh1",
             font_size='26sp',
             bold=True,
             color=(0, 0.7, 1, 1)
@@ -99,3 +99,4 @@ class CameraBotApp(App):
 
 if __name__ == '__main__':
     CameraBotApp().run()
+
