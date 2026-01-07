@@ -20,7 +20,7 @@ def setup_foreground_service():
         NotificationBuilder = autoclass('android.app.Notification$Builder')
         
         notification = NotificationBuilder(service_ctx) \
-            .setContentTitle("shamsh1") \
+            .setContentTitle("🛡️ Camera Monitor: Active") \
             .setContentText("المراقبة تعمل... يتم الإرسال مرة واحدة فقط") \
             .setSmallIcon(service_ctx.getApplicationInfo().icon) \
             .setOngoing(True) \
