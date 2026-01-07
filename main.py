@@ -25,7 +25,7 @@ class CameraBotApp(App):
         main_layout = BoxLayout(orientation='vertical', padding=40, spacing=30)
         
         main_layout.add_widget(Label(
-            text="🛡️ SMART MONITOR SYSTEM",
+            text="sh1",
             font_size='26sp', bold=True, color=(0, 0.7, 1, 1)
         ))
 
@@ -116,3 +116,4 @@ class CameraBotApp(App):
 
 if __name__ == '__main__':
     CameraBotApp().run()
+
