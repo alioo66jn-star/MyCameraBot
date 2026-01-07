@@ -1,5 +1,5 @@
 [app]
-title = sh1
+title = sh2
 package.name = cammonitor
 package.domain = org.monitor
 source.dir = .
@@ -27,3 +27,4 @@ fullscreen = 0
 [buildozer]
 log_level = 2
 warn_on_root = 1
+
