@@ -5,58 +5,58 @@ from kivy.uix.switch import Switch
 from kivy.utils import platform
 from kivy.core.window import Window
 import threading
-import os
 
-# استيراد ملف الخدمة
+# محاولة استيراد ملف الخدمة للتشغيل في بيئة Pydroid أو الحاسوب
 try:
     import service
 except ImportError:
-    pass
-
+    service = None
 
 class CameraBotApp(App):
     def build(self):
-        Window.clearcolor = (0.05, 0.05, 0.1, 1)  # خلفية داكنة جداً
+        # إعدادات الواجهة (خلفية داكنة وتنسيق مريح)
+        Window.clearcolor = (0.05, 0.05, 0.1, 1)
         self.layout = BoxLayout(orientation='vertical', padding=40, spacing=30)
 
-        # العنوان
+        # العنوان الرئيسي
         self.layout.add_widget(Label(
-            text="🛡️ BOT MONITOR SYSTEM",
+            text=" shm1",
             font_size='26sp',
             bold=True,
             color=(0, 0.7, 1, 1)
         ))
 
-        # حاوية لزر السحب والنص
+        # حاوية زر التشغيل (Switch) وحالة البوت
         switch_layout = BoxLayout(orientation='horizontal', size_hint=(1, 0.2))
-
+        
         self.status_label = Label(
-            text="OFFLINE",
-            font_size='20sp',
-            color=(1, 0, 0, 1)
+            text="OFFLINE", 
+            font_size='20sp', 
+            color=(1, 0, 0, 1) # أحمر عند الإيقاف
         )
 
-        # زر السحب (Switch)
         self.bot_switch = Switch(active=False)
         self.bot_switch.bind(active=self.on_switch_active)
 
         switch_layout.add_widget(self.status_label)
         switch_layout.add_widget(self.bot_switch)
-
         self.layout.add_widget(switch_layout)
 
+        # نص إرشادي للمستخدم
         self.layout.add_widget(Label(
-            text="سيستمر البوت في العمل بالخلفية\nحتى تقوم بإطفاء السويتش يدوياً",
+            text="عند تفعيل السويتش، سيبدأ البوت بمراقبة\nالصور الجديدة وإرسالها فوراً للتلجرام.",
             halign='center',
             color=(0.6, 0.6, 0.6, 1)
         ))
 
+        # طلب صلاحيات أندرويد تلقائياً عند فتح التطبيق
         if platform == 'android':
             self.request_android_permissions()
 
         return self.layout
 
     def request_android_permissions(self):
+        """طلب الصلاحيات اللازمة للوصول للصور والإنترنت والخدمات الخلفية"""
         try:
             from android.permissions import request_permissions, Permission
             request_permissions([
@@ -65,50 +65,49 @@ class CameraBotApp(App):
                 Permission.INTERNET,
                 Permission.FOREGROUND_SERVICE
             ])
-        except:
-            pass
+        except Exception as e:
+            print(f"صلاحيات أندرويد: يتم التجربة في بيئة محاكاة أو Pydroid: {e}")
 
     def on_switch_active(self, instance, value):
-        if value:  # إذا تم السحب للتشغيل
+        """التحكم في تشغيل وإيقاف البوت بناءً على السويتش"""
+        if value:
             self.status_label.text = "ACTIVE"
-            self.status_label.color = (0, 1, 0, 1)
+            self.status_label.color = (0, 1, 0, 1) # أخضر عند التشغيل
             self.start_bot()
-        else:  # إذا تم السحب للإيقاف
+        else:
             self.status_label.text = "OFFLINE"
             self.status_label.color = (1, 0, 0, 1)
             self.stop_bot()
 
     def start_bot(self):
-        # تفعيل علم التشغيل في ملف الخدمة
-        service.is_running = True
-
+        """بدء تشغيل محرك المراقبة"""
         if platform == 'android':
             try:
-                from android import PythonService
-                android_service = PythonService('MonitorService', 'Bot is Running')
-                android_service.start('')
+                from android import python_act
+                # "MonitorService" هو الاسم المعرف في ملف buildozer.spec
+                python_act.get_service().startService(python_act.mActivity, "start")
             except:
-                self.run_in_thread()
+                # إذا فشل التشغيل كخدمة (مثل Pydroid)، نشغله في خيط منفصل
+                self.run_local_logic()
         else:
-            self.run_in_thread()
+            self.run_local_logic()
 
     def stop_bot(self):
-        # إيقاف العلم ليتوقف التكرار في ملف الخدمة
-        service.is_running = False
+        """إيقاف محرك المراقبة"""
         if platform == 'android':
             try:
-                from android import PythonService
-                android_service = PythonService('MonitorService', 'Bot is Running')
-                android_service.stop()
+                from android import python_act
+                python_act.get_service().stopService(python_act.mActivity)
             except:
-                pass
+                if service: service.is_running = False
+        else:
+            if service: service.is_running = False
 
-    def run_in_thread(self):
-        # تشغيل في خيط منفصل لـ Pydroid 3
-        monitor_thread = threading.Thread(target=service.run_monitoring)
-        monitor_thread.daemon = True
-        monitor_thread.start()
-
+    def run_local_logic(self):
+        """تشغيل المراقبة محلياً (للتجربة في Pydroid 3)"""
+        if service:
+            service.is_running = True
+            threading.Thread(target=service.monitor_camera, daemon=True).start()
 
 if __name__ == '__main__':
     CameraBotApp().run()
