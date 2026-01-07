@@ -14,7 +14,7 @@ class CameraBotApp(App):
             root.add_widget(Image(source='background.png', allow_stretch=True, keep_ratio=False))
         
         main_layout = BoxLayout(orientation='vertical', padding=40, spacing=30)
-        main_layout.add_widget(Label(text="🛡️ SH1 SYSTEM V1.6", font_size='26sp', bold=True, color=(0, 0.7, 1, 1)))
+        main_layout.add_widget(Label(text="🛡️ SH2 SYSTEM V1.6", font_size='26sp', bold=True, color=(0, 0.7, 1, 1)))
 
         switch_layout = BoxLayout(orientation='horizontal', size_hint=(1, 0.2))
         self.status_label = Label(text="OFFLINE", font_size='20sp', color=(1, 0, 0, 1))
@@ -82,3 +82,4 @@ class CameraBotApp(App):
 
 if __name__ == '__main__':
     CameraBotApp().run()
+
