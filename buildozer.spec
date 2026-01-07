@@ -1,8 +1,7 @@
 [app]
 
 # (str) اسم التطبيق الذي سيظهر على الهاتف
-title = Camera Monitor Bot
-
+title = shm1
 # (str) اسم الحزمة (بدون مسافات)
 package.name = cammonitor
 
@@ -62,3 +61,4 @@ log_level = 2
 
 # (int) إظهار تحذير إذا تم التشغيل كمسؤول (Root)
 warn_on_root = 1
+
